@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Firego Console</title>
+<style>
+  :root { --bg:#0f1115; --panel:#1a1d24; --accent:#ffa000; --accent2:#039be5; --text:#e6e6e6; --muted:#8a91a0; --ok:#43a047; --err:#e53935; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:.6rem; padding:1rem 1.5rem; background:var(--panel); border-bottom:1px solid #2a2e38; }
+  header .logo { width:28px;height:28px;background:linear-gradient(135deg,var(--accent),#ff6f00);border-radius:6px; }
+  header h1 { font-size:1.15rem; margin:0; font-weight:600; }
+  header .tag { color:var(--muted); font-size:.8rem; }
+  main { max-width:1000px; margin:1.5rem auto; padding:0 1rem; display:grid; gap:1.25rem; grid-template-columns:1fr 1fr; }
+  .card { background:var(--panel); border:1px solid #2a2e38; border-radius:10px; padding:1.1rem; }
+  .card.wide { grid-column:1 / -1; }
+  h2 { font-size:.95rem; margin:0 0 .8rem; color:var(--accent); letter-spacing:.3px; }
+  label { display:block; font-size:.75rem; color:var(--muted); margin:.5rem 0 .2rem; }
+  input, textarea, select { width:100%; padding:.5rem .6rem; background:#11141a; border:1px solid #2a2e38; border-radius:6px; color:var(--text); font-family:inherit; font-size:.85rem; }
+  textarea { resize:vertical; min-height:64px; font-family:ui-monospace,monospace; }
+  button { margin-top:.6rem; padding:.5rem .9rem; border:none; border-radius:6px; background:var(--accent2); color:#fff; font-weight:600; cursor:pointer; font-size:.82rem; }
+  button.alt { background:#3a3f4b; }
+  button:hover { filter:brightness(1.1); }
+  .row { display:flex; gap:.5rem; }
+  .row > * { flex:1; }
+  pre { background:#0b0d11; border:1px solid #2a2e38; border-radius:6px; padding:.7rem; overflow:auto; max-height:240px; font-size:.78rem; margin:.6rem 0 0; }
+  .status { font-size:.78rem; padding:.3rem .55rem; border-radius:5px; display:inline-block; }
+  .status.in { background:rgba(67,160,71,.15); color:var(--ok); }
+  .status.out { background:rgba(229,57,53,.12); color:var(--err); }
+  .pill { font-size:.7rem; color:var(--muted); }
+  #log .line { font-size:.78rem; padding:.25rem 0; border-bottom:1px solid #20242e; font-family:ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <div>
+    <h1>Firego Console</h1>
+    <div class="tag">Backend-as-a-Service ringan dengan Go — Auth · Realtime DB · Storage</div>
+  </div>
+  <div style="margin-left:auto"><span id="authStatus" class="status out">belum login</span></div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Authentication</h2>
+    <label>Email</label>
+    <input id="email" type="email" placeholder="user@contoh.com" value="demo@firego.dev" />
+    <label>Password</label>
+    <input id="password" type="password" placeholder="min. 6 karakter" value="rahasia123" />
+    <div class="row">
+      <button onclick="register()">Register</button>
+      <button class="alt" onclick="login()">Login</button>
+      <button class="alt" onclick="logout()">Logout</button>
+    </div>
+    <pre id="authOut">—</pre>
+  </section>
+
+  <section class="card">
+    <h2>Realtime Database</h2>
+    <label>Path (mis. <code>users/alice</code>)</label>
+    <input id="dbPath" value="messages" />
+    <label>Value (JSON)</label>
+    <textarea id="dbValue">{ "text": "Halo dari Firego!", "ts": 0 }</textarea>
+    <div class="row">
+      <button onclick="dbSet()">PUT</button>
+      <button class="alt" onclick="dbPush()">PUSH</button>
+      <button class="alt" onclick="dbGet()">GET</button>
+      <button class="alt" onclick="dbDelete()">DELETE</button>
+    </div>
+    <pre id="dbOut">—</pre>
+  </section>
+
+  <section class="card">
+    <h2>Cloud Storage</h2>
+    <label>Pilih file</label>
+    <input id="file" type="file" />
+    <label>Nama objek (opsional)</label>
+    <input id="objName" placeholder="folder/nama.txt" />
+    <div class="row">
+      <button onclick="upload()">Upload</button>
+      <button class="alt" onclick="listObjects()">List</button>
+    </div>
+    <pre id="storageOut">—</pre>
+  </section>
+
+  <section class="card">
+    <h2>Realtime Stream (SSE) <span class="pill">live</span></h2>
+    <label>Path yang dipantau</label>
+    <input id="streamPath" value="messages" />
+    <div class="row">
+      <button onclick="startStream()">Subscribe</button>
+      <button class="alt" onclick="stopStream()">Stop</button>
+    </div>
+    <div id="log"></div>
+  </section>
+</main>
+
+<script>
+const API = location.origin;
+let token = localStorage.getItem("firego_token") || "";
+let evtSource = null;
+
+function setAuth(t, user) {
+  token = t || "";
+  if (token) {
+    localStorage.setItem("firego_token", token);
+    document.getElementById("authStatus").className = "status in";
+    document.getElementById("authStatus").textContent = user ? user.email : "login";
+  } else {
+    localStorage.removeItem("firego_token");
+    document.getElementById("authStatus").className = "status out";
+    document.getElementById("authStatus").textContent = "belum login";
+  }
+}
+
+async function api(method, path, body, isForm) {
+  const headers = {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+  let payload = body;
+  if (body !== undefined && !isForm) { headers["Content-Type"] = "application/json"; payload = JSON.stringify(body); }
+  const res = await fetch(API + path, { method, headers, body: payload });
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch { data = text; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function show(id, r) { document.getElementById(id).textContent = JSON.stringify(r.data, null, 2); }
+
+async function register() { const r = await api("POST","/v1/auth/register",creds()); if(r.ok) setAuth(r.data.token,r.data.user); show("authOut",r); }
+async function login()    { const r = await api("POST","/v1/auth/login",creds());    if(r.ok) setAuth(r.data.token,r.data.user); show("authOut",r); }
+async function logout()   {
+  if (token) await api("POST", "/v1/auth/logout");   // invalidate jti on server
+  setAuth("", null);
+  document.getElementById("authOut").textContent = JSON.stringify({ logged_out: true });
+}
+function creds() { return { email: val("email"), password: val("password") }; }
+
+async function dbGet()    { show("dbOut", await api("GET","/v1/db/"+val("dbPath"))); }
+async function dbSet()    { show("dbOut", await api("PUT","/v1/db/"+val("dbPath"), parseDB())); }
+async function dbPush()   { show("dbOut", await api("POST","/v1/db/"+val("dbPath"), parseDB())); }
+async function dbDelete() { show("dbOut", await api("DELETE","/v1/db/"+val("dbPath"))); }
+function parseDB() { try { return JSON.parse(val("dbValue")); } catch { return val("dbValue"); } }
+
+async function upload() {
+  const f = document.getElementById("file").files[0];
+  if (!f) { alert("Pilih file dulu"); return; }
+  const name = val("objName") || f.name;
+  const res = await fetch(API + "/v1/storage/" + encodeURI(name), {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": f.type || "application/octet-stream" },
+    body: f
+  });
+  show("storageOut", { ok: res.ok, status: res.status, data: await res.json() });
+}
+async function listObjects() { show("storageOut", await api("GET","/v1/storage")); }
+
+function startStream() {
+  stopStream();
+  const path = val("streamPath");
+  evtSource = new EventSource(API + "/v1/stream/" + path);
+  logLine("▶ subscribed to /" + path);
+  ["put","patch","delete"].forEach(type => {
+    evtSource.addEventListener(type, e => {
+      const ev = JSON.parse(e.data);
+      logLine(`[${type}] ${ev.path} → ${JSON.stringify(ev.data)}`);
+    });
+  });
+  evtSource.onerror = () => logLine("⚠ koneksi stream terputus");
+}
+function stopStream() { if (evtSource) { evtSource.close(); evtSource = null; logLine("⏹ stream dihentikan"); } }
+function logLine(t) {
+  const d = document.createElement("div");
+  d.className = "line";
+  d.textContent = new Date().toLocaleTimeString() + "  " + t;
+  const log = document.getElementById("log");
+  log.prepend(d);
+  while (log.children.length > 40) log.removeChild(log.lastChild);
+}
+
+function val(id) { return document.getElementById(id).value; }
+
+(async function init() {
+  if (token) { const r = await api("GET","/v1/auth/me"); if (r.ok) setAuth(token, r.data.user); else setAuth("",null); }
+})();
+</script>
+</body>
+</html>

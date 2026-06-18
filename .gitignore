@@ -1,0 +1,5 @@
+# Build artifacts
+/firego
+# Runtime data (persisted by the server)
+/data/
+*.tmp
