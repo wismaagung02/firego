@@ -50,6 +50,35 @@ pre{background:#0b0d11;border:1px solid var(--border);border-radius:6px;padding:
 .config-snippet pre{max-height:180px;font-size:.74rem}
 .copy-btn{position:absolute;top:.4rem;right:.4rem;padding:.2rem .55rem;font-size:.72rem;background:#2c3140}
 code{font-family:ui-monospace,monospace;font-size:.82em;background:#111418;padding:.1em .3em;border-radius:3px}
+
+/* ── Docs Modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;width:min(960px,100%);flex-shrink:0;display:flex;flex-direction:column;overflow:hidden}
+.modal-hd{display:flex;align-items:center;padding:.85rem 1.2rem;border-bottom:1px solid var(--border);gap:.6rem}
+.modal-hd h2{font-size:.95rem;font-weight:700;color:var(--accent);margin:0;flex:1;text-transform:none;letter-spacing:0}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;line-height:1;padding:.1rem .4rem;border-radius:4px}
+.modal-close:hover{background:var(--panel2);color:var(--text)}
+.modal-tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--panel2);scrollbar-width:none}
+.modal-tabs::-webkit-scrollbar{display:none}
+.modal-tabs button{flex-shrink:0;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:.55rem .9rem;font-size:.77rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:color .15s}
+.modal-tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.modal-tabs button:hover:not(.active){color:var(--text)}
+.modal-body{padding:1.2rem 1.4rem;overflow-y:auto;max-height:70vh}
+.doc-sec{display:none}
+.doc-sec.active{display:block}
+.doc-sec>h3{font-size:.8rem;font-weight:700;color:var(--accent2);margin:1.1rem 0 .4rem;border-bottom:1px solid var(--border);padding-bottom:.3rem;text-transform:none}
+.doc-sec>h3:first-child{margin-top:0}
+.doc-sec p{font-size:.78rem;color:var(--muted);margin:.3rem 0 .5rem;line-height:1.5}
+.ep{display:flex;align-items:baseline;gap:.55rem;margin:.28rem 0}
+.m{font-size:.68rem;font-weight:700;padding:.12rem .38rem;border-radius:3px;min-width:52px;text-align:center;letter-spacing:.3px}
+.m.get{background:#0d2b1a;color:#43a047}.m.post{background:#0d1e2b;color:#039be5}
+.m.put{background:#2b1f0d;color:#ffa000}.m.patch{background:#1e0d2b;color:#ab47bc}
+.m.del{background:#2b0d0d;color:#e53935}
+.ep-path{font-family:ui-monospace,monospace;font-size:.78rem;color:var(--text)}
+.dc{background:#080a0e;border:1px solid var(--border);border-radius:6px;padding:.75rem .9rem;margin:.5rem 0 .9rem;font-family:ui-monospace,monospace;font-size:.75rem;white-space:pre;overflow-x:auto;line-height:1.6;color:#c9d1d9}
+.note{background:#111830;border-left:3px solid var(--accent2);padding:.45rem .75rem;border-radius:0 5px 5px 0;margin:.4rem 0 .8rem;font-size:.76rem;color:var(--muted);line-height:1.5}
+.tag{display:inline-block;font-size:.68rem;padding:.1rem .35rem;border-radius:3px;background:#1a2a1a;color:#43a047;margin-left:.3rem}
 </style>
 </head>
 <body>
@@ -61,6 +90,7 @@ code{font-family:ui-monospace,monospace;font-size:.82em;background:#111418;paddi
   <div class="hspacer"></div>
   <span id="authChip" class="chip err">belum login</span>
   <span id="ruleChip" class="chip" style="display:none"></span>
+  <button class="alt" style="font-size:.76rem;padding:.3rem .7rem" onclick="openDocs()">📖 Dokumentasi</button>
 </header>
 
 <!-- ── App selector bar ── -->
@@ -464,6 +494,472 @@ async function mergeRemoteConfig() {
     loadRemoteConfig()
   }
 })()
+
+// ── Docs Modal ────────────────────────────────────────────────────────────
+function openDocs(tab) {
+  document.querySelector('.modal-overlay').classList.add('open')
+  switchTab(tab || 'overview')
+}
+function closeDocs() {
+  document.querySelector('.modal-overlay').classList.remove('open')
+}
+function switchTab(name) {
+  document.querySelectorAll('.modal-tabs button').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === name))
+  document.querySelectorAll('.doc-sec').forEach(s =>
+    s.classList.toggle('active', s.id === 'doc-' + name))
+}
+document.querySelector('.modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeDocs()
+})
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDocs() })
 </script>
+
+<!-- ── Docs Modal ── -->
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Dokumentasi API">
+  <div class="modal">
+    <div class="modal-hd">
+      <h2>📖 Dokumentasi API Firego</h2>
+      <span style="font-size:.72rem;color:var(--muted)">v1.0 · Firebase-like Backend in Go</span>
+      <button class="modal-close" onclick="closeDocs()" title="Tutup">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <button data-tab="overview"     onclick="switchTab('overview')"     class="active">Overview</button>
+      <button data-tab="sdkconfig"    onclick="switchTab('sdkconfig')"   >SDK Config</button>
+      <button data-tab="auth"         onclick="switchTab('auth')"        >Auth</button>
+      <button data-tab="database"     onclick="switchTab('database')"    >Database</button>
+      <button data-tab="stream"       onclick="switchTab('stream')"      >Realtime SSE</button>
+      <button data-tab="storage"      onclick="switchTab('storage')"     >Storage</button>
+      <button data-tab="remoteconfig" onclick="switchTab('remoteconfig')">Remote Config</button>
+      <button data-tab="rules"        onclick="switchTab('rules')"       >Security Rules</button>
+      <button data-tab="appmgmt"      onclick="switchTab('appmgmt')"     >App Management</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- ── Overview ── -->
+      <div class="doc-sec active" id="doc-overview">
+        <h3>Apa itu Firego?</h3>
+        <p>Firego adalah backend self-hosted mirip Firebase, ditulis dalam Go. Setiap <b>App</b> memiliki layanan terisolasi: Auth, Database, Storage, Realtime Stream, Remote Config, dan Security Rules.</p>
+        <div class="dc">Base URL    : http://localhost:8080
+Client API  : /v1/{appID}/...
+Admin API   : /admin/...       (butuh Admin Key)
+Health      : GET /healthz</div>
+        <div class="note">Admin Key tampil di terminal saat server start. Simpan di kolom "Admin Key" di header console.</div>
+
+        <h3>Autentikasi Request</h3>
+        <p>Endpoint client yang membutuhkan auth menerima JWT Bearer token:</p>
+        <div class="dc">Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</div>
+        <p>Endpoint admin menerima Admin Key via header:</p>
+        <div class="dc">Authorization: Bearer &lt;admin-key&gt;
+<span style="color:#6e7681">// atau</span>
+X-Admin-Key: &lt;admin-key&gt;</div>
+
+        <h3>Format Response</h3>
+        <p>Semua response berformat JSON. Error dikembalikan dengan field <code>error</code>:</p>
+        <div class="dc">// Sukses
+{ "user": { ... }, "token": "eyJ..." }
+
+// Error
+{ "error": "invalid or expired token" }</div>
+
+        <h3>Rate Limiting</h3>
+        <p>Endpoint auth (<code>/auth/register</code>, <code>/auth/login</code>) dibatasi <b>10 request/menit per IP</b>. Respon 429 jika melebihi batas.</p>
+
+        <h3>Multi-App</h3>
+        <p>Setiap app memiliki data, user, token, dan secret JWT yang sepenuhnya terisolasi. Token dari app A tidak berlaku di app B.</p>
+      </div>
+
+      <!-- ── SDK Config ── -->
+      <div class="doc-sec" id="doc-sdkconfig">
+        <h3>Mendapatkan SDK Config</h3>
+        <p>Endpoint publik untuk mendapatkan konfigurasi inisialisasi app. Gunakan ini di client sebelum melakukan request lain.</p>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/v1/{appID}/config</span></div>
+        <div class="dc">// Response
+{
+  "appId":         "default",
+  "name":          "Default App",
+  "apiKey":        "a3f9c2...",      // identitas app untuk client
+  "authDomain":    "http://host/v1/default/auth",
+  "databaseURL":   "http://host/v1/default/db",
+  "storageBucket": "http://host/v1/default/storage",
+  "streamURL":     "http://host/v1/default/stream",
+  "createdAt":     1718000000
+}</div>
+        <div class="note">Tidak perlu autentikasi. <code>apiKey</code> adalah identifier app — berbeda dengan Admin Key.</div>
+
+        <h3>Contoh Penggunaan (JavaScript)</h3>
+        <div class="dc">const cfg = await fetch('/v1/default/config').then(r => r.json())
+console.log('DB URL:', cfg.databaseURL)
+console.log('API Key:', cfg.apiKey)</div>
+      </div>
+
+      <!-- ── Auth ── -->
+      <div class="doc-sec" id="doc-auth">
+        <h3>Register</h3>
+        <div class="ep"><span class="m post">POST</span><span class="ep-path">/v1/{appID}/auth/register</span></div>
+        <div class="dc">// Request Body
+{ "email": "user@example.com", "password": "rahasia123" }
+
+// Response 201
+{
+  "user":  { "uid": "abc123", "email": "user@example.com" },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}</div>
+        <div class="note">Password minimal 8 karakter. Email harus unik per app. Rate limit 10 req/menit per IP.</div>
+
+        <h3>Login</h3>
+        <div class="ep"><span class="m post">POST</span><span class="ep-path">/v1/{appID}/auth/login</span></div>
+        <div class="dc">// Request Body
+{ "email": "user@example.com", "password": "rahasia123" }
+
+// Response 200
+{
+  "user":  { "uid": "abc123", "email": "user@example.com" },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}</div>
+
+        <h3>Logout</h3>
+        <div class="ep"><span class="m post">POST</span><span class="ep-path">/v1/{appID}/auth/logout</span></div>
+        <div class="dc">// Header: Authorization: Bearer {token}
+// Response 200
+{ "logged_out": true }</div>
+        <div class="note">Logout menginvalidasi token di server (blacklist JWT). Token tidak bisa dipakai lagi meski belum expired.</div>
+
+        <h3>Info User Saat Ini</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/v1/{appID}/auth/me</span></div>
+        <div class="dc">// Header: Authorization: Bearer {token}
+// Response 200
+{ "user": { "uid": "abc123", "email": "user@example.com" } }</div>
+
+        <h3>Keamanan Auth</h3>
+        <p>• Password di-hash dengan <b>bcrypt cost 12</b><br>
+        • JWT menggunakan <b>HMAC-SHA256</b> dengan secret unik per app<br>
+        • Klaim <code>jti</code> untuk token revocation (blacklist in-memory)<br>
+        • Anti-user-enumeration: waktu respons login sama meski user tidak ada</p>
+      </div>
+
+      <!-- ── Database ── -->
+      <div class="doc-sec" id="doc-database">
+        <h3>Struktur Data</h3>
+        <p>Database berupa JSON tree. Setiap node diakses via path seperti <code>/users/alice/profile</code>. Data tersimpan di disk dan disinkronkan ke subscriber SSE secara realtime.</p>
+        <div class="note">Semua operasi tulis membutuhkan autentikasi. Akses dikontrol oleh <b>Security Rules</b>.</div>
+
+        <h3>Baca Data</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/v1/{appID}/db/{path}</span></div>
+        <div class="dc">// Contoh: GET /v1/default/db/users/alice
+// Response 200
+{ "name": "Alice", "age": 28 }
+
+// Jika tidak ditemukan → null</div>
+
+        <h3>Tulis / Replace</h3>
+        <div class="ep"><span class="m put">PUT</span><span class="ep-path">/v1/{appID}/db/{path}</span></div>
+        <div class="dc">// Header: Authorization: Bearer {token}
+// Body: nilai JSON apa pun (object, array, string, number, bool, null)
+{ "name": "Alice", "age": 28 }
+
+// Response 200 → nilai yang disimpan</div>
+
+        <h3>Update Sebagian (Merge)</h3>
+        <div class="ep"><span class="m patch">PATCH</span><span class="ep-path">/v1/{appID}/db/{path}</span></div>
+        <div class="dc">// Hanya field yang dikirim yang diperbarui, field lain tetap
+{ "age": 29 }
+// Response 200 → field yang diupdate</div>
+
+        <h3>Push (Auto-Key)</h3>
+        <div class="ep"><span class="m post">POST</span><span class="ep-path">/v1/{appID}/db/{path}</span></div>
+        <div class="dc">// Membuat child baru dengan key unik berurutan (Firebase Push ID)
+{ "text": "Pesan baru", "ts": 1718000000 }
+
+// Response 201
+{ "name": "-Ns7K2qMjAbcDeFgHiJ" }   // key yang dibuat</div>
+
+        <h3>Hapus</h3>
+        <div class="ep"><span class="m del">DEL</span><span class="ep-path">/v1/{appID}/db/{path}</span></div>
+        <div class="dc">// Header: Authorization: Bearer {token}
+// Response 200
+{ "deleted": true }</div>
+
+        <h3>Aturan Path</h3>
+        <p>Segmen path boleh mengandung huruf, angka, underscore, tanda hubung, dan titik. Tidak boleh ada <code>..</code> atau segmen kosong.</p>
+      </div>
+
+      <!-- ── Realtime SSE ── -->
+      <div class="doc-sec" id="doc-stream">
+        <h3>Subscribe Perubahan Data</h3>
+        <p>Gunakan Server-Sent Events (SSE) untuk mendapatkan update realtime saat data berubah.</p>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/v1/{appID}/stream/{path}</span></div>
+        <div class="note">Snapshot awal langsung dikirim saat connect. Keepalive dikirim tiap 30 detik.</div>
+
+        <h3>Tipe Event</h3>
+        <div class="dc">event: put     → data ditulis/direplace (PUT)
+event: patch   → data diupdate sebagian (PATCH)
+event: delete  → data dihapus (DELETE)</div>
+
+        <h3>Format Data Event</h3>
+        <div class="dc">event: put
+data: {"type":"put","path":"/messages/-Ns7K2qM","data":{"text":"Halo!"}}</div>
+
+        <h3>Contoh JavaScript</h3>
+        <div class="dc">const es = new EventSource('/v1/default/stream/messages')
+
+es.addEventListener('put', e =&gt; {
+  const { path, data } = JSON.parse(e.data)
+  console.log('PUT', path, data)
+})
+
+es.addEventListener('patch', e =&gt; {
+  const { path, data } = JSON.parse(e.data)
+  console.log('PATCH', path, data)
+})
+
+es.addEventListener('delete', e =&gt; {
+  const { path } = JSON.parse(e.data)
+  console.log('DELETE', path)
+})
+
+es.onerror = () =&gt; console.warn('Stream terputus, browser akan retry...')
+
+// Berhenti listen
+es.close()</div>
+        <div class="note">Browser otomatis retry SSE jika koneksi putus. Akses stream dikontrol oleh Security Rules — path tanpa izin read akan ditolak dengan 403.</div>
+      </div>
+
+      <!-- ── Storage ── -->
+      <div class="doc-sec" id="doc-storage">
+        <h3>Upload File</h3>
+        <div class="ep"><span class="m post">POST</span><span class="ep-path">/v1/{appID}/storage/{name}</span></div>
+        <div class="dc">// Header: Authorization: Bearer {token}
+// Header: Content-Type: image/png   (atau tipe file Anda)
+// Body  : binary file content
+
+// Response 201
+{
+  "name":         "foto/avatar.png",
+  "contentType":  "image/png",
+  "size":         204800,
+  "uploadedAt":   1718000000
+}</div>
+        <div class="note">Ukuran maksimum upload: <b>100 MiB</b>. Nama file dengan <code>/</code> otomatis membuat struktur folder.</div>
+
+        <h3>Download File</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/v1/{appID}/storage/{name}</span></div>
+        <div class="dc">// Response: binary file dengan Content-Type sesuai file</div>
+
+        <h3>List Objek</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/v1/{appID}/storage</span></div>
+        <div class="dc">// Query param opsional: ?prefix=foto/
+// Response 200
+{
+  "objects": [
+    { "name": "foto/avatar.png", "contentType": "image/png", "size": 204800, "uploadedAt": 1718000000 }
+  ]
+}</div>
+
+        <h3>Hapus Objek</h3>
+        <div class="ep"><span class="m del">DEL</span><span class="ep-path">/v1/{appID}/storage/{name}</span></div>
+        <div class="dc">// Header: Authorization: Bearer {token}
+// Response 200
+{ "deleted": true }</div>
+
+        <h3>Contoh Upload (JavaScript)</h3>
+        <div class="dc">const file = document.querySelector('input[type=file]').files[0]
+const res = await fetch('/v1/default/storage/foto/avatar.png', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ' + token,
+    'Content-Type': file.type
+  },
+  body: file
+})
+const obj = await res.json()
+console.log('Tersimpan:', obj.name)</div>
+      </div>
+
+      <!-- ── Remote Config ── -->
+      <div class="doc-sec" id="doc-remoteconfig">
+        <h3>Apa itu Remote Config?</h3>
+        <p>Remote Config adalah key-value store per app yang bisa diubah admin kapan saja tanpa deploy ulang. Client membacanya saat startup untuk mendapatkan konfigurasi terkini (feature flags, pesan, threshold, dsb.).</p>
+
+        <h3>Baca Config (Client)</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/v1/{appID}/remote-config</span></div>
+        <div class="dc">// Tidak perlu autentikasi
+// Response 200
+{
+  "maintenance_mode":  false,
+  "welcome_message":   "Selamat datang!",
+  "max_upload_mb":     10,
+  "feature_dark_mode": true
+}</div>
+
+        <h3>Baca Config (Admin)</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/admin/apps/{appID}/remote-config</span></div>
+        <div class="dc">// Header: X-Admin-Key: {admin-key}
+// Response 200 → semua parameter saat ini</div>
+
+        <h3>Replace Semua Parameter (Admin)</h3>
+        <div class="ep"><span class="m put">PUT</span><span class="ep-path">/admin/apps/{appID}/remote-config</span></div>
+        <div class="dc">// Header: X-Admin-Key: {admin-key}
+// Body: object JSON baru (mengganti seluruh config)
+{
+  "maintenance_mode": false,
+  "welcome_message":  "Halo!"
+}
+// Response 200
+{ "updated": true }</div>
+
+        <h3>Merge / Update Sebagian (Admin)</h3>
+        <div class="ep"><span class="m patch">PATCH</span><span class="ep-path">/admin/apps/{appID}/remote-config</span></div>
+        <div class="dc">// Hanya key yang dikirim yang diupdate, key lain tetap
+{ "maintenance_mode": true }
+// Response 200
+{ "updated": true }</div>
+
+        <h3>Hapus Satu Key (Admin)</h3>
+        <div class="ep"><span class="m del">DEL</span><span class="ep-path">/admin/apps/{appID}/remote-config/{key}</span></div>
+        <div class="dc">// Response 200
+{ "deleted": true }</div>
+
+        <h3>Contoh Penggunaan di Client</h3>
+        <div class="dc">// Ambil config saat startup
+const cfg = await fetch('/v1/default/remote-config').then(r => r.json())
+
+if (cfg.maintenance_mode) {
+  showMaintenanceBanner(cfg.welcome_message)
+}
+if (cfg.feature_dark_mode) {
+  document.body.classList.add('dark')</div>
+      </div>
+
+      <!-- ── Security Rules ── -->
+      <div class="doc-sec" id="doc-rules">
+        <h3>Format Rules</h3>
+        <p>Rules ditulis sebagai JSON tree. Setiap node bisa memiliki <code>.read</code> dan/atau <code>.write</code> berupa ekspresi string.</p>
+        <div class="dc">{
+  "rules": {
+    ".read":  "ekspresi_boolean",
+    ".write": "ekspresi_boolean",
+    "nama_child": {
+      ".read":  "ekspresi_lain",
+      "$variable": {
+        ".read":  "auth.uid === $variable",
+        ".write": "auth.uid === $variable"
+      }
+    }
+  }
+}</div>
+
+        <h3>Ekspresi yang Didukung</h3>
+        <div class="dc">true / false                  → nilai literal
+auth != null               → user sudah login
+auth == null               → user belum login
+auth.uid                   → UID user saat ini
+auth.email                 → email user saat ini
+$variable                  → segment path wildcard
+'string'                   → nilai string literal
+&&  ||  !                  → operator logika
+===  !==  ==  !=           → operator perbandingan</div>
+
+        <h3>Contoh: Default (Auth Required)</h3>
+        <div class="dc">{
+  "rules": {
+    ".read":  "auth != null",
+    ".write": "auth != null"
+  }
+}</div>
+
+        <h3>Contoh: Public Read, Auth Write</h3>
+        <div class="dc">{
+  "rules": {
+    ".read":  "true",
+    ".write": "auth != null"
+  }
+}</div>
+
+        <h3>Contoh: Per-User Data</h3>
+        <div class="dc">{
+  "rules": {
+    ".read":  "false",
+    ".write": "false",
+    "users": {
+      "$uid": {
+        ".read":  "auth.uid === $uid",
+        ".write": "auth.uid === $uid"
+      }
+    }
+  }
+}</div>
+
+        <h3>Contoh: Chat Publik</h3>
+        <div class="dc">{
+  "rules": {
+    ".read": "true",
+    "messages": {
+      ".write": "auth != null"
+    }
+  }
+}</div>
+
+        <h3>Aturan Warisan (Cascade)</h3>
+        <p>Jika parent memberikan akses <code>true</code>, semua child path otomatis mendapat akses yang sama — tidak bisa dicabut oleh rule child. Ini sama persis dengan perilaku Firebase.</p>
+        <div class="note">Default rules: <code>.read</code> dan <code>.write</code> = <code>"auth != null"</code>. Ekspresi yang tidak dikenali → <b>deny (false)</b>.</div>
+
+        <h3>Update Rules (Admin)</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/admin/apps/{appID}/rules</span></div>
+        <div class="ep"><span class="m put">PUT</span><span class="ep-path">/admin/apps/{appID}/rules</span></div>
+        <div class="dc">// PUT Body: JSON rules baru
+// Response: { "updated": true }</div>
+      </div>
+
+      <!-- ── App Management ── -->
+      <div class="doc-sec" id="doc-appmgmt">
+        <h3>List Semua App</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/admin/apps</span></div>
+        <div class="dc">// Header: X-Admin-Key: {admin-key}
+// Response 200
+{
+  "apps": [
+    { "id": "default", "name": "Default App", "apiKey": "...", "createdAt": 1718000000 },
+    { "id": "my-app",  "name": "My App",      "apiKey": "...", "createdAt": 1718001000 }
+  ]
+}</div>
+
+        <h3>Buat App Baru</h3>
+        <div class="ep"><span class="m post">POST</span><span class="ep-path">/admin/apps</span></div>
+        <div class="dc">// Header: X-Admin-Key: {admin-key}
+// Body:
+{ "id": "my-app", "name": "My Application" }
+
+// Response 201
+{ "id": "my-app", "name": "My Application", "apiKey": "...", "createdAt": 1718000000 }
+
+// ID Rules: 3-30 karakter, huruf kecil/angka/tanda-hubung, awali huruf/angka</div>
+
+        <h3>Detail App</h3>
+        <div class="ep"><span class="m get">GET</span><span class="ep-path">/admin/apps/{appID}</span></div>
+        <div class="dc">// Response 200 → Info app (id, name, apiKey, createdAt)</div>
+
+        <h3>Hapus App</h3>
+        <div class="ep"><span class="m del">DEL</span><span class="ep-path">/admin/apps/{appID}</span></div>
+        <div class="dc">// App "default" tidak bisa dihapus (403 Forbidden)
+// Response 200
+{ "deleted": true }</div>
+        <div class="note">Menghapus app akan menghapus SEMUA data: user, database, storage, rules, remote config. Tidak bisa di-undo.</div>
+
+        <h3>Isolasi Antar App</h3>
+        <p>Setiap app memiliki:</p>
+        <div class="dc">data/apps/{appID}/
+  ├── users.json          ← user auth
+  ├── database.json       ← JSON tree database
+  ├── storage/            ← file storage
+  ├── rules.json          ← security rules
+  └── remote_config.json  ← remote config params</div>
+        <p>JWT secret per app diturunkan dari master secret via <code>HMAC-SHA256(masterSecret, "firego-app:" + appID)</code> — token antar app tidak saling berlaku.</p>
+      </div>
+
+    </div><!-- /.modal-body -->
+  </div><!-- /.modal -->
+</div><!-- /.modal-overlay -->
+
 </body>
 </html>
