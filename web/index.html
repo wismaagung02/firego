@@ -45,6 +45,10 @@ pre{background:#0b0d11;border:1px solid var(--border);border-radius:6px;padding:
 .apptag span:hover{opacity:1;color:var(--red)}
 #log .line{font-size:.76rem;padding:.22rem 0;border-bottom:1px solid #1c2030;font-family:ui-monospace,monospace}
 .rules-box{font-family:ui-monospace,monospace;min-height:160px;font-size:.8rem}
+.rc-box{font-family:ui-monospace,monospace;min-height:120px;font-size:.8rem}
+.config-snippet{position:relative}
+.config-snippet pre{max-height:180px;font-size:.74rem}
+.copy-btn{position:absolute;top:.4rem;right:.4rem;padding:.2rem .55rem;font-size:.72rem;background:#2c3140}
 code{font-family:ui-monospace,monospace;font-size:.82em;background:#111418;padding:.1em .3em;border-radius:3px}
 </style>
 </head>
@@ -99,6 +103,32 @@ code{font-family:ui-monospace,monospace;font-size:.82em;background:#111418;paddi
       <button onclick="saveRules()">Simpan</button>
     </div>
     <pre id="rulesOut">—</pre>
+  </section>
+
+  <!-- ── SDK Config ── -->
+  <section class="card wide">
+    <h2>SDK Config</h2>
+    <p style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem">Gunakan config ini untuk menginisialisasi client SDK. <code>apiKey</code> digunakan sebagai identitas app.</p>
+    <div class="config-snippet">
+      <pre id="sdkConfigOut">—</pre>
+      <button class="copy-btn" onclick="copySDKConfig()">Salin</button>
+    </div>
+    <div class="row">
+      <button class="alt" onclick="loadSDKConfig()">↺ Muat Config</button>
+    </div>
+  </section>
+
+  <!-- ── Remote Config ── -->
+  <section class="card">
+    <h2>Remote Config</h2>
+    <p style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem">Key-value config yang bisa dibaca client via <code>GET /v1/{appID}/remote-config</code></p>
+    <textarea class="rc-box" id="remoteConfigEditor" placeholder='{"maintenance_mode": false, "welcome_message": "Halo!"}'></textarea>
+    <div class="row">
+      <button onclick="loadRemoteConfig()">↺ Muat</button>
+      <button onclick="saveRemoteConfig()">Simpan (replace)</button>
+      <button class="alt" onclick="mergeRemoteConfig()">Merge</button>
+    </div>
+    <pre id="remoteConfigOut">—</pre>
   </section>
 
   <!-- ── Auth ── -->
@@ -242,6 +272,8 @@ function onAppChange() {
   setAuthChip(null)
   $('authOut').textContent = `Beralih ke app: ${currentApp}`
   stopStream()
+  loadSDKConfig()
+  if (adminKey()) { loadRules(); loadRemoteConfig() }
 }
 
 function showNewApp() {
@@ -362,6 +394,56 @@ function logLine(t) {
   while (log.children.length > 50) log.removeChild(log.lastChild)
 }
 
+// ── SDK Config ────────────────────────────────────────────────────────────
+async function loadSDKConfig() {
+  const r = await api('GET', appPrefix() + '/config')
+  if (r.ok) {
+    $('sdkConfigOut').textContent = JSON.stringify(r.data, null, 2)
+  } else {
+    show('sdkConfigOut', r)
+  }
+}
+
+function copySDKConfig() {
+  const text = $('sdkConfigOut').textContent
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn')
+    const orig = btn.textContent
+    btn.textContent = '✓ Disalin!'
+    setTimeout(() => btn.textContent = orig, 2000)
+  })
+}
+
+// ── Remote Config ─────────────────────────────────────────────────────────
+async function loadRemoteConfig() {
+  const r = await adminApi('GET', '/admin/apps/' + currentApp + '/remote-config')
+  if (r.ok) {
+    $('remoteConfigEditor').value = JSON.stringify(r.data, null, 2)
+    $('remoteConfigOut').textContent = 'Remote config dimuat (' + Object.keys(r.data).length + ' parameter)'
+  } else {
+    show('remoteConfigOut', r)
+  }
+}
+
+async function saveRemoteConfig() {
+  let body
+  try { body = JSON.parse(val('remoteConfigEditor')) } catch(e) {
+    $('remoteConfigOut').textContent = 'JSON tidak valid: ' + e; return
+  }
+  const r = await adminApi('PUT', '/admin/apps/' + currentApp + '/remote-config', body)
+  show('remoteConfigOut', r)
+}
+
+async function mergeRemoteConfig() {
+  let body
+  try { body = JSON.parse(val('remoteConfigEditor')) } catch(e) {
+    $('remoteConfigOut').textContent = 'JSON tidak valid: ' + e; return
+  }
+  const r = await adminApi('PATCH', '/admin/apps/' + currentApp + '/remote-config', body)
+  show('remoteConfigOut', r)
+  if (r.ok) loadRemoteConfig()
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 ;(async function init() {
   const saved = localStorage.getItem('firego_admin_key')
@@ -375,8 +457,12 @@ function logLine(t) {
     else setAuthChip(null)
   }
 
-  // Auto-load rules for current app
-  if (adminKey()) loadRules()
+  // Auto-load data for current app
+  await loadSDKConfig()
+  if (adminKey()) {
+    loadRules()
+    loadRemoteConfig()
+  }
 })()
 </script>
 </body>

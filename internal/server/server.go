@@ -67,6 +67,14 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /admin/apps/{appID}", s.requireAdmin(s.handleDeleteApp))
 	s.mux.HandleFunc("GET /admin/apps/{appID}/rules", s.requireAdmin(s.handleGetRules))
 	s.mux.HandleFunc("PUT /admin/apps/{appID}/rules", s.requireAdmin(s.handlePutRules))
+	s.mux.HandleFunc("GET /admin/apps/{appID}/remote-config", s.requireAdmin(s.handleGetRemoteConfig))
+	s.mux.HandleFunc("PUT /admin/apps/{appID}/remote-config", s.requireAdmin(s.handlePutRemoteConfig))
+	s.mux.HandleFunc("PATCH /admin/apps/{appID}/remote-config", s.requireAdmin(s.handlePatchRemoteConfig))
+	s.mux.HandleFunc("DELETE /admin/apps/{appID}/remote-config/{key}", s.requireAdmin(s.handleDeleteRemoteConfigKey))
+
+	// ── Per-app SDK Config & Remote Config ────────────────────────────
+	s.mux.HandleFunc("GET /v1/{appID}/config", s.appRoute(s.handleSDKConfig))
+	s.mux.HandleFunc("GET /v1/{appID}/remote-config", s.appRoute(s.handleClientRemoteConfig))
 
 	// ── Per-app Auth ───────────────────────────────────────────────────
 	s.mux.HandleFunc("POST /v1/{appID}/auth/register", s.appRoute(s.rateLimited(s.handleRegister)))
@@ -283,6 +291,91 @@ func (s *Server) handlePutRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"updated": true})
+}
+
+// ─── SDK Config & Remote Config handlers ────────────────────────────────────
+
+func (s *Server) handleSDKConfig(w http.ResponseWriter, r *http.Request, app *apps.App) {
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	base := fmt.Sprintf("%s://%s/v1/%s", scheme, r.Host, app.ID)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"appId":         app.ID,
+		"name":          app.Name,
+		"apiKey":        app.APIKey,
+		"authDomain":    base + "/auth",
+		"databaseURL":   base + "/db",
+		"storageBucket": base + "/storage",
+		"streamURL":     base + "/stream",
+		"createdAt":     app.CreatedAt,
+	})
+}
+
+func (s *Server) handleClientRemoteConfig(w http.ResponseWriter, r *http.Request, app *apps.App) {
+	writeJSON(w, http.StatusOK, app.RemoteConfig.Get())
+}
+
+func (s *Server) handleGetRemoteConfig(w http.ResponseWriter, r *http.Request) {
+	app, err := s.mgr.Get(r.PathValue("appID"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, app.RemoteConfig.Get())
+}
+
+func (s *Server) handlePutRemoteConfig(w http.ResponseWriter, r *http.Request) {
+	app, err := s.mgr.Get(r.PathValue("appID"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	var params map[string]any
+	if !decodeJSON(w, r, &params) {
+		return
+	}
+	if err := app.RemoteConfig.Set(params); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"updated": true})
+}
+
+func (s *Server) handlePatchRemoteConfig(w http.ResponseWriter, r *http.Request) {
+	app, err := s.mgr.Get(r.PathValue("appID"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	var updates map[string]any
+	if !decodeJSON(w, r, &updates) {
+		return
+	}
+	if err := app.RemoteConfig.Merge(updates); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"updated": true})
+}
+
+func (s *Server) handleDeleteRemoteConfigKey(w http.ResponseWriter, r *http.Request) {
+	app, err := s.mgr.Get(r.PathValue("appID"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	key := r.PathValue("key")
+	if key == "" {
+		writeError(w, http.StatusBadRequest, "key is required")
+		return
+	}
+	if err := app.RemoteConfig.DeleteKey(key); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
 // ─── Auth handlers ───────────────────────────────────────────────────────────

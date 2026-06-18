@@ -47,11 +47,12 @@ type Info struct {
 // App is a running app instance with its own isolated services.
 type App struct {
 	Info
-	Auth  *auth.Service
-	DB    *database.DB
-	Store *storage.Store
-	Hub   *realtime.Hub
-	Rules *rules.RuleSet
+	Auth         *auth.Service
+	DB           *database.DB
+	Store        *storage.Store
+	Hub          *realtime.Hub
+	Rules        *rules.RuleSet
+	RemoteConfig *RemoteConfig
 }
 
 // Manager creates, loads and deletes apps.
@@ -162,7 +163,11 @@ func (m *Manager) initServices(info Info) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{Info: info, Auth: authSvc, DB: db, Store: store, Hub: hub, Rules: rs}, nil
+	rconf, err := newRemoteConfig(filepath.Join(dir, "remote_config.json"))
+	if err != nil {
+		return nil, err
+	}
+	return &App{Info: info, Auth: authSvc, DB: db, Store: store, Hub: hub, Rules: rs, RemoteConfig: rconf}, nil
 }
 
 // create must be called with the write lock held.
