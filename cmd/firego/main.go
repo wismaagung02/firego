@@ -1,6 +1,6 @@
-// Command firego starts the Firego server: a small, dependency-free
-// Firebase-style backend offering authentication, a realtime JSON database
-// and cloud storage over HTTP.
+// Command firego starts the Firego server — a Firebase-like backend offering
+// multi-app support, authentication, realtime JSON database with security rules,
+// and cloud storage.
 package main
 
 import (
@@ -17,41 +17,31 @@ import (
 	"syscall"
 	"time"
 
-	"firego/internal/auth"
-	"firego/internal/database"
-	"firego/internal/realtime"
+	"firego/internal/apps"
 	"firego/internal/server"
-	"firego/internal/storage"
 )
 
 func main() {
-	addr := flag.String("addr", envOr("FIREGO_ADDR", ":8080"), "HTTP listen address")
-	dataDir := flag.String("data", envOr("FIREGO_DATA", "data"), "directory for persisted data")
-	webDir := flag.String("web", envOr("FIREGO_WEB", "web"), "directory served as the dashboard")
+	addr    := flag.String("addr", envOr("FIREGO_ADDR", ":8080"), "HTTP listen address")
+	dataDir := flag.String("data", envOr("FIREGO_DATA", "data"),  "directory for persisted data")
+	webDir  := flag.String("web",  envOr("FIREGO_WEB",  "web"),   "directory served as the dashboard")
 	flag.Parse()
 
 	if err := os.MkdirAll(*dataDir, 0o755); err != nil {
 		log.Fatalf("create data dir: %v", err)
 	}
 
-	secret := loadSecret(filepath.Join(*dataDir, "secret.key"))
+	masterSecret := loadOrGenKey(filepath.Join(*dataDir, "secret.key"))
+	adminKey     := loadOrGenKey(filepath.Join(*dataDir, "admin.key"))
 
-	hub := realtime.NewHub()
-
-	authSvc, err := auth.New(filepath.Join(*dataDir, "users.json"), secret)
+	mgr, err := apps.New(*dataDir, masterSecret)
 	if err != nil {
-		log.Fatalf("init auth: %v", err)
-	}
-	db, err := database.New(filepath.Join(*dataDir, "database.json"), hub)
-	if err != nil {
-		log.Fatalf("init database: %v", err)
-	}
-	store, err := storage.New(filepath.Join(*dataDir, "storage"))
-	if err != nil {
-		log.Fatalf("init storage: %v", err)
+		log.Fatalf("init app manager: %v", err)
 	}
 
-	srv := server.New(authSvc, db, store, hub, *webDir)
+	log.Printf("Admin key: %s", adminKey)
+
+	srv := server.New(mgr, string(adminKey), *webDir)
 	httpServer := &http.Server{
 		Addr:              *addr,
 		Handler:           srv.Handler(),
@@ -65,31 +55,29 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown on SIGINT/SIGTERM.
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
-	log.Println("shutting down...")
+	log.Println("shutting down…")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(ctx); err != nil {
-		log.Printf("shutdown error: %v", err)
+		log.Printf("shutdown: %v", err)
 	}
 }
 
-// loadSecret reads the JWT signing secret from path, generating and persisting
-// a new random one on first run.
-func loadSecret(path string) []byte {
+// loadOrGenKey reads an existing key from path or creates and persists a fresh one.
+func loadOrGenKey(path string) []byte {
 	if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
 		return data
 	}
-	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
-		log.Fatalf("generate secret: %v", err)
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("generate key: %v", err)
 	}
-	encoded := []byte(hex.EncodeToString(secret))
+	encoded := []byte(hex.EncodeToString(b))
 	if err := os.WriteFile(path, encoded, 0o600); err != nil {
-		log.Fatalf("persist secret: %v", err)
+		log.Fatalf("persist key %s: %v", path, err)
 	}
 	return encoded
 }

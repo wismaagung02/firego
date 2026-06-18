@@ -5,50 +5,109 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Firego Console</title>
 <style>
-  :root { --bg:#0f1115; --panel:#1a1d24; --accent:#ffa000; --accent2:#039be5; --text:#e6e6e6; --muted:#8a91a0; --ok:#43a047; --err:#e53935; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
-  header { display:flex; align-items:center; gap:.6rem; padding:1rem 1.5rem; background:var(--panel); border-bottom:1px solid #2a2e38; }
-  header .logo { width:28px;height:28px;background:linear-gradient(135deg,var(--accent),#ff6f00);border-radius:6px; }
-  header h1 { font-size:1.15rem; margin:0; font-weight:600; }
-  header .tag { color:var(--muted); font-size:.8rem; }
-  main { max-width:1000px; margin:1.5rem auto; padding:0 1rem; display:grid; gap:1.25rem; grid-template-columns:1fr 1fr; }
-  .card { background:var(--panel); border:1px solid #2a2e38; border-radius:10px; padding:1.1rem; }
-  .card.wide { grid-column:1 / -1; }
-  h2 { font-size:.95rem; margin:0 0 .8rem; color:var(--accent); letter-spacing:.3px; }
-  label { display:block; font-size:.75rem; color:var(--muted); margin:.5rem 0 .2rem; }
-  input, textarea, select { width:100%; padding:.5rem .6rem; background:#11141a; border:1px solid #2a2e38; border-radius:6px; color:var(--text); font-family:inherit; font-size:.85rem; }
-  textarea { resize:vertical; min-height:64px; font-family:ui-monospace,monospace; }
-  button { margin-top:.6rem; padding:.5rem .9rem; border:none; border-radius:6px; background:var(--accent2); color:#fff; font-weight:600; cursor:pointer; font-size:.82rem; }
-  button.alt { background:#3a3f4b; }
-  button:hover { filter:brightness(1.1); }
-  .row { display:flex; gap:.5rem; }
-  .row > * { flex:1; }
-  pre { background:#0b0d11; border:1px solid #2a2e38; border-radius:6px; padding:.7rem; overflow:auto; max-height:240px; font-size:.78rem; margin:.6rem 0 0; }
-  .status { font-size:.78rem; padding:.3rem .55rem; border-radius:5px; display:inline-block; }
-  .status.in { background:rgba(67,160,71,.15); color:var(--ok); }
-  .status.out { background:rgba(229,57,53,.12); color:var(--err); }
-  .pill { font-size:.7rem; color:var(--muted); }
-  #log .line { font-size:.78rem; padding:.25rem 0; border-bottom:1px solid #20242e; font-family:ui-monospace,monospace; }
+:root{--bg:#0f1115;--panel:#1a1d24;--panel2:#20242e;--accent:#ffa000;--accent2:#039be5;--green:#43a047;--red:#e53935;--text:#e6e6e6;--muted:#8a91a0;--border:#2a2e38}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+header{display:flex;align-items:center;gap:.8rem;padding:.75rem 1.25rem;background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;flex-wrap:wrap}
+.logo{width:26px;height:26px;background:linear-gradient(135deg,var(--accent),#ff6f00);border-radius:6px;flex-shrink:0}
+header h1{font-size:1.05rem;font-weight:700;flex-shrink:0}
+.hspacer{flex:1}
+.chip{font-size:.72rem;color:var(--muted);padding:.2rem .5rem;border:1px solid var(--border);border-radius:4px;cursor:default}
+.chip.ok{color:var(--green);border-color:var(--green)}
+.chip.err{color:var(--red);border-color:var(--red)}
+
+/* ── App bar ── */
+#appBar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.6rem 1.25rem;background:var(--panel2);border-bottom:1px solid var(--border)}
+#appBar label{font-size:.76rem;color:var(--muted)}
+select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.3rem .5rem;font-size:.8rem}
+#adminKeyInput{width:240px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.3rem .5rem;font-size:.8rem;font-family:ui-monospace,monospace}
+
+/* ── Layout ── */
+main{max-width:1100px;margin:1.2rem auto;padding:0 1rem;display:grid;gap:1rem;grid-template-columns:1fr 1fr}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:1.1rem}
+.card.wide{grid-column:1/-1}
+h2{font-size:.88rem;font-weight:700;color:var(--accent);margin-bottom:.75rem;letter-spacing:.3px;text-transform:uppercase}
+h3{font-size:.8rem;font-weight:600;color:var(--muted);margin:.6rem 0 .3rem}
+label{display:block;font-size:.73rem;color:var(--muted);margin:.45rem 0 .2rem}
+input,textarea,select{width:100%;padding:.45rem .55rem;background:#11141a;border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:.83rem}
+textarea{resize:vertical;min-height:72px;font-family:ui-monospace,monospace;font-size:.8rem}
+.row{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.55rem}
+button{padding:.42rem .85rem;border:none;border-radius:6px;background:var(--accent2);color:#fff;font-weight:600;cursor:pointer;font-size:.8rem;white-space:nowrap}
+button.alt{background:#2c3140}
+button.danger{background:#7b1f1f}
+button:hover{filter:brightness(1.12)}
+pre{background:#0b0d11;border:1px solid var(--border);border-radius:6px;padding:.65rem;overflow:auto;max-height:220px;font-size:.76rem;margin-top:.55rem;white-space:pre-wrap;word-break:break-all}
+.applist{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.5rem}
+.apptag{display:flex;align-items:center;gap:.4rem;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:.3rem .55rem;font-size:.76rem}
+.apptag span{opacity:.55;cursor:pointer;font-size:.9rem}
+.apptag span:hover{opacity:1;color:var(--red)}
+#log .line{font-size:.76rem;padding:.22rem 0;border-bottom:1px solid #1c2030;font-family:ui-monospace,monospace}
+.rules-box{font-family:ui-monospace,monospace;min-height:160px;font-size:.8rem}
+code{font-family:ui-monospace,monospace;font-size:.82em;background:#111418;padding:.1em .3em;border-radius:3px}
 </style>
 </head>
 <body>
+
+<!-- ── Header ── -->
 <header>
   <div class="logo"></div>
-  <div>
-    <h1>Firego Console</h1>
-    <div class="tag">Backend-as-a-Service ringan dengan Go — Auth · Realtime DB · Storage</div>
-  </div>
-  <div style="margin-left:auto"><span id="authStatus" class="status out">belum login</span></div>
+  <h1>Firego Console</h1>
+  <div class="hspacer"></div>
+  <span id="authChip" class="chip err">belum login</span>
+  <span id="ruleChip" class="chip" style="display:none"></span>
 </header>
 
+<!-- ── App selector bar ── -->
+<div id="appBar">
+  <label>App:</label>
+  <select id="appSelect" onchange="onAppChange()"></select>
+  <button class="alt" style="font-size:.76rem;padding:.3rem .6rem" onclick="showNewApp()">+ Buat App</button>
+  <div class="hspacer"></div>
+  <label>Admin Key:</label>
+  <input id="adminKeyInput" type="password" placeholder="paste admin key dari terminal…" oninput="saveAdminKey()" />
+  <button class="alt" style="font-size:.76rem;padding:.3rem .6rem" onclick="loadApps()">↺ Refresh</button>
+</div>
+
 <main>
+
+  <!-- ── App Management ── -->
+  <section class="card">
+    <h2>App Management</h2>
+    <div id="applistEl" class="applist"></div>
+    <div id="newAppForm" style="display:none;margin-top:.6rem">
+      <label>ID App <code>hanya huruf kecil, angka, tanda hubung (3-30 karakter)</code></label>
+      <input id="newAppID" placeholder="my-app" />
+      <label>Nama</label>
+      <input id="newAppName" placeholder="My Application" />
+      <div class="row">
+        <button onclick="createApp()">Buat</button>
+        <button class="alt" onclick="document.getElementById('newAppForm').style.display='none'">Batal</button>
+      </div>
+    </div>
+    <pre id="appOut">—</pre>
+  </section>
+
+  <!-- ── Security Rules ── -->
+  <section class="card">
+    <h2>Security Rules</h2>
+    <p style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem">Ekspresi: <code>auth != null</code> · <code>auth.uid === $uid</code> · <code>true</code> / <code>false</code> · <code>&amp;&amp;</code> <code>||</code> <code>!</code></p>
+    <textarea class="rules-box" id="rulesEditor"></textarea>
+    <div class="row">
+      <button onclick="loadRules()">↺ Muat</button>
+      <button onclick="saveRules()">Simpan</button>
+    </div>
+    <pre id="rulesOut">—</pre>
+  </section>
+
+  <!-- ── Auth ── -->
   <section class="card">
     <h2>Authentication</h2>
     <label>Email</label>
-    <input id="email" type="email" placeholder="user@contoh.com" value="demo@firego.dev" />
+    <input id="email" type="email" value="demo@firego.dev" />
     <label>Password</label>
-    <input id="password" type="password" placeholder="min. 6 karakter" value="rahasia123" />
+    <input id="password" type="password" value="rahasia123" />
     <div class="row">
       <button onclick="register()">Register</button>
       <button class="alt" onclick="login()">Login</button>
@@ -57,21 +116,24 @@
     <pre id="authOut">—</pre>
   </section>
 
+  <!-- ── Realtime Database ── -->
   <section class="card">
     <h2>Realtime Database</h2>
     <label>Path (mis. <code>users/alice</code>)</label>
     <input id="dbPath" value="messages" />
     <label>Value (JSON)</label>
-    <textarea id="dbValue">{ "text": "Halo dari Firego!", "ts": 0 }</textarea>
+    <textarea id="dbValue">{"text":"Halo dari Firego!","ts":0}</textarea>
     <div class="row">
       <button onclick="dbSet()">PUT</button>
+      <button class="alt" onclick="dbPatch()">PATCH</button>
       <button class="alt" onclick="dbPush()">PUSH</button>
       <button class="alt" onclick="dbGet()">GET</button>
-      <button class="alt" onclick="dbDelete()">DELETE</button>
+      <button class="alt danger" onclick="dbDelete()">DEL</button>
     </div>
     <pre id="dbOut">—</pre>
   </section>
 
+  <!-- ── Cloud Storage ── -->
   <section class="card">
     <h2>Cloud Storage</h2>
     <label>Pilih file</label>
@@ -85,8 +147,9 @@
     <pre id="storageOut">—</pre>
   </section>
 
+  <!-- ── Realtime Stream ── -->
   <section class="card">
-    <h2>Realtime Stream (SSE) <span class="pill">live</span></h2>
+    <h2>Realtime Stream (SSE)</h2>
     <label>Path yang dipantau</label>
     <input id="streamPath" value="messages" />
     <div class="row">
@@ -95,95 +158,226 @@
     </div>
     <div id="log"></div>
   </section>
+
 </main>
 
 <script>
-const API = location.origin;
-let token = localStorage.getItem("firego_token") || "";
-let evtSource = null;
+// ── State ─────────────────────────────────────────────────────────────────
+const API = location.origin
+let currentApp = localStorage.getItem('firego_app') || 'default'
+let token      = localStorage.getItem('firego_token') || ''
+let evtSource  = null
 
-function setAuth(t, user) {
-  token = t || "";
-  if (token) {
-    localStorage.setItem("firego_token", token);
-    document.getElementById("authStatus").className = "status in";
-    document.getElementById("authStatus").textContent = user ? user.email : "login";
+// ── Helpers ───────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id)
+const val = id => $(id).value
+
+function adminKey() { return val('adminKeyInput') }
+function saveAdminKey() { localStorage.setItem('firego_admin_key', adminKey()) }
+
+async function api(method, path, body, opts = {}) {
+  const headers = {}
+  if (token) headers['Authorization'] = 'Bearer ' + token
+  if (body !== undefined && !(body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json'
+    body = JSON.stringify(body)
+  }
+  const res = await fetch(API + path, { method, headers, body, ...opts })
+  const text = await res.text()
+  let data; try { data = JSON.parse(text) } catch { data = text }
+  return { ok: res.ok, status: res.status, data }
+}
+
+async function adminApi(method, path, body) {
+  const headers = { 'Authorization': 'Bearer ' + adminKey() }
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    body = JSON.stringify(body)
+  }
+  const res = await fetch(API + path, { method, headers, body })
+  const text = await res.text()
+  let data; try { data = JSON.parse(text) } catch { data = text }
+  return { ok: res.ok, status: res.status, data }
+}
+
+function show(id, r) { $(id).textContent = JSON.stringify(r.data, null, 2) }
+function appPrefix() { return '/v1/' + currentApp }
+
+// ── App selector ──────────────────────────────────────────────────────────
+async function loadApps() {
+  const r = await adminApi('GET', '/admin/apps')
+  if (!r.ok) { show('appOut', r); return }
+
+  const appList = (r.data.apps || []).sort((a, b) => a.id < b.id ? -1 : 1)
+  const sel = $('appSelect')
+  sel.innerHTML = ''
+  const listEl = $('applistEl')
+  listEl.innerHTML = ''
+
+  appList.forEach(a => {
+    const opt = document.createElement('option')
+    opt.value = a.id
+    opt.textContent = `${a.id}  (${a.name})`
+    if (a.id === currentApp) opt.selected = true
+    sel.appendChild(opt)
+
+    const tag = document.createElement('div')
+    tag.className = 'apptag'
+    tag.innerHTML = `<b>${a.id}</b> <em style="opacity:.5">${a.name}</em>` +
+      (a.id !== 'default' ? `<span title="Hapus" onclick="deleteApp('${a.id}')">✕</span>` : '')
+    listEl.appendChild(tag)
+  })
+  if (!appList.find(a => a.id === currentApp)) {
+    currentApp = 'default'
+    localStorage.setItem('firego_app', currentApp)
+  }
+  $('appOut').textContent = `${appList.length} app terdaftar`
+}
+
+function onAppChange() {
+  currentApp = val('appSelect')
+  localStorage.setItem('firego_app', currentApp)
+  token = ''
+  localStorage.removeItem('firego_token')
+  setAuthChip(null)
+  $('authOut').textContent = `Beralih ke app: ${currentApp}`
+  stopStream()
+}
+
+function showNewApp() {
+  $('newAppForm').style.display = $('newAppForm').style.display === 'none' ? '' : 'none'
+}
+
+async function createApp() {
+  const id = val('newAppID').trim()
+  const name = val('newAppName').trim() || id
+  const r = await adminApi('POST', '/admin/apps', { id, name })
+  show('appOut', r)
+  if (r.ok) { $('newAppForm').style.display = 'none'; loadApps() }
+}
+
+async function deleteApp(id) {
+  if (!confirm(`Hapus app "${id}" beserta semua datanya?`)) return
+  const r = await adminApi('DELETE', '/admin/apps/' + id)
+  show('appOut', r)
+  if (r.ok) loadApps()
+}
+
+// ── Rules ─────────────────────────────────────────────────────────────────
+async function loadRules() {
+  const r = await adminApi('GET', '/admin/apps/' + currentApp + '/rules')
+  if (r.ok) {
+    $('rulesEditor').value = JSON.stringify(r.data, null, 2)
+    $('rulesOut').textContent = 'rules dimuat'
   } else {
-    localStorage.removeItem("firego_token");
-    document.getElementById("authStatus").className = "status out";
-    document.getElementById("authStatus").textContent = "belum login";
+    show('rulesOut', r)
   }
 }
 
-async function api(method, path, body, isForm) {
-  const headers = {};
-  if (token) headers["Authorization"] = "Bearer " + token;
-  let payload = body;
-  if (body !== undefined && !isForm) { headers["Content-Type"] = "application/json"; payload = JSON.stringify(body); }
-  const res = await fetch(API + path, { method, headers, body: payload });
-  const text = await res.text();
-  let data; try { data = JSON.parse(text); } catch { data = text; }
-  return { ok: res.ok, status: res.status, data };
+async function saveRules() {
+  let body
+  try { body = JSON.parse(val('rulesEditor')) } catch(e) { $('rulesOut').textContent = 'JSON tidak valid: ' + e; return }
+  const r = await adminApi('PUT', '/admin/apps/' + currentApp + '/rules', body)
+  show('rulesOut', r)
 }
 
-function show(id, r) { document.getElementById(id).textContent = JSON.stringify(r.data, null, 2); }
-
-async function register() { const r = await api("POST","/v1/auth/register",creds()); if(r.ok) setAuth(r.data.token,r.data.user); show("authOut",r); }
-async function login()    { const r = await api("POST","/v1/auth/login",creds());    if(r.ok) setAuth(r.data.token,r.data.user); show("authOut",r); }
-async function logout()   {
-  if (token) await api("POST", "/v1/auth/logout");   // invalidate jti on server
-  setAuth("", null);
-  document.getElementById("authOut").textContent = JSON.stringify({ logged_out: true });
+// ── Auth ──────────────────────────────────────────────────────────────────
+function setAuthChip(user) {
+  const chip = $('authChip')
+  if (user) {
+    token = localStorage.getItem('firego_token') || token
+    chip.className = 'chip ok'
+    chip.textContent = user.email
+  } else {
+    token = ''
+    localStorage.removeItem('firego_token')
+    chip.className = 'chip err'
+    chip.textContent = 'belum login'
+  }
 }
-function creds() { return { email: val("email"), password: val("password") }; }
 
-async function dbGet()    { show("dbOut", await api("GET","/v1/db/"+val("dbPath"))); }
-async function dbSet()    { show("dbOut", await api("PUT","/v1/db/"+val("dbPath"), parseDB())); }
-async function dbPush()   { show("dbOut", await api("POST","/v1/db/"+val("dbPath"), parseDB())); }
-async function dbDelete() { show("dbOut", await api("DELETE","/v1/db/"+val("dbPath"))); }
-function parseDB() { try { return JSON.parse(val("dbValue")); } catch { return val("dbValue"); } }
+async function register() {
+  const r = await api('POST', appPrefix() + '/auth/register', creds())
+  if (r.ok) { token = r.data.token; localStorage.setItem('firego_token', token); setAuthChip(r.data.user) }
+  show('authOut', r)
+}
+async function login() {
+  const r = await api('POST', appPrefix() + '/auth/login', creds())
+  if (r.ok) { token = r.data.token; localStorage.setItem('firego_token', token); setAuthChip(r.data.user) }
+  show('authOut', r)
+}
+async function logout() {
+  if (token) await api('POST', appPrefix() + '/auth/logout')
+  setAuthChip(null)
+  $('authOut').textContent = '{"logged_out":true}'
+}
+function creds() { return { email: val('email'), password: val('password') } }
 
+// ── Database ──────────────────────────────────────────────────────────────
+function parseDB() { try { return JSON.parse(val('dbValue')) } catch { return val('dbValue') } }
+async function dbGet()    { show('dbOut', await api('GET',    appPrefix() + '/db/' + val('dbPath'))) }
+async function dbSet()    { show('dbOut', await api('PUT',    appPrefix() + '/db/' + val('dbPath'), parseDB())) }
+async function dbPatch()  { show('dbOut', await api('PATCH',  appPrefix() + '/db/' + val('dbPath'), parseDB())) }
+async function dbPush()   { show('dbOut', await api('POST',   appPrefix() + '/db/' + val('dbPath'), parseDB())) }
+async function dbDelete() { show('dbOut', await api('DELETE', appPrefix() + '/db/' + val('dbPath'))) }
+
+// ── Storage ───────────────────────────────────────────────────────────────
 async function upload() {
-  const f = document.getElementById("file").files[0];
-  if (!f) { alert("Pilih file dulu"); return; }
-  const name = val("objName") || f.name;
-  const res = await fetch(API + "/v1/storage/" + encodeURI(name), {
-    method: "POST",
-    headers: { "Authorization": "Bearer " + token, "Content-Type": f.type || "application/octet-stream" },
+  const f = $('file').files[0]
+  if (!f) { alert('Pilih file dulu'); return }
+  const name = val('objName') || f.name
+  const res = await fetch(API + appPrefix() + '/storage/' + encodeURI(name), {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': f.type || 'application/octet-stream' },
     body: f
-  });
-  show("storageOut", { ok: res.ok, status: res.status, data: await res.json() });
+  })
+  show('storageOut', { ok: res.ok, status: res.status, data: await res.json() })
 }
-async function listObjects() { show("storageOut", await api("GET","/v1/storage")); }
+async function listObjects() { show('storageOut', await api('GET', appPrefix() + '/storage')) }
 
+// ── Realtime Stream ───────────────────────────────────────────────────────
 function startStream() {
-  stopStream();
-  const path = val("streamPath");
-  evtSource = new EventSource(API + "/v1/stream/" + path);
-  logLine("▶ subscribed to /" + path);
-  ["put","patch","delete"].forEach(type => {
+  stopStream()
+  const path = val('streamPath')
+  const url = API + appPrefix() + '/stream/' + path
+  evtSource = new EventSource(url)
+  logLine('▶ subscribed to /' + path + ' (app: ' + currentApp + ')')
+  ;['put','patch','delete'].forEach(type => {
     evtSource.addEventListener(type, e => {
-      const ev = JSON.parse(e.data);
-      logLine(`[${type}] ${ev.path} → ${JSON.stringify(ev.data)}`);
-    });
-  });
-  evtSource.onerror = () => logLine("⚠ koneksi stream terputus");
+      const ev = JSON.parse(e.data)
+      logLine('[' + type + '] ' + ev.path + ' → ' + JSON.stringify(ev.data))
+    })
+  })
+  evtSource.onerror = () => logLine('⚠ koneksi stream terputus')
 }
-function stopStream() { if (evtSource) { evtSource.close(); evtSource = null; logLine("⏹ stream dihentikan"); } }
+function stopStream() {
+  if (evtSource) { evtSource.close(); evtSource = null; logLine('⏹ stream dihentikan') }
+}
 function logLine(t) {
-  const d = document.createElement("div");
-  d.className = "line";
-  d.textContent = new Date().toLocaleTimeString() + "  " + t;
-  const log = document.getElementById("log");
-  log.prepend(d);
-  while (log.children.length > 40) log.removeChild(log.lastChild);
+  const d = document.createElement('div')
+  d.className = 'line'
+  d.textContent = new Date().toLocaleTimeString() + '  ' + t
+  const log = $('log')
+  log.prepend(d)
+  while (log.children.length > 50) log.removeChild(log.lastChild)
 }
 
-function val(id) { return document.getElementById(id).value; }
+// ── Init ──────────────────────────────────────────────────────────────────
+;(async function init() {
+  const saved = localStorage.getItem('firego_admin_key')
+  if (saved) $('adminKeyInput').value = saved
 
-(async function init() {
-  if (token) { const r = await api("GET","/v1/auth/me"); if (r.ok) setAuth(token, r.data.user); else setAuth("",null); }
-})();
+  await loadApps()
+
+  if (token) {
+    const r = await api('GET', appPrefix() + '/auth/me')
+    if (r.ok) setAuthChip(r.data.user)
+    else setAuthChip(null)
+  }
+
+  // Auto-load rules for current app
+  if (adminKey()) loadRules()
+})()
 </script>
 </body>
 </html>
