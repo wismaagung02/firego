@@ -130,7 +130,11 @@ function show(id, r) { document.getElementById(id).textContent = JSON.stringify(
 
 async function register() { const r = await api("POST","/v1/auth/register",creds()); if(r.ok) setAuth(r.data.token,r.data.user); show("authOut",r); }
 async function login()    { const r = await api("POST","/v1/auth/login",creds());    if(r.ok) setAuth(r.data.token,r.data.user); show("authOut",r); }
-function logout()         { setAuth("",null); document.getElementById("authOut").textContent = "logged out"; }
+async function logout()   {
+  if (token) await api("POST", "/v1/auth/logout");   // invalidate jti on server
+  setAuth("", null);
+  document.getElementById("authOut").textContent = JSON.stringify({ logged_out: true });
+}
 function creds() { return { email: val("email"), password: val("password") }; }
 
 async function dbGet()    { show("dbOut", await api("GET","/v1/db/"+val("dbPath"))); }

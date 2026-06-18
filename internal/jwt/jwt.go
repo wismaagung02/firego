@@ -22,26 +22,22 @@ type header struct {
 }
 
 // Claims is the set of values carried inside a token. Standard registered
-// claims (sub, exp, iat) are kept alongside arbitrary custom fields.
+// claims (sub, exp, iat, jti) are kept alongside optional custom fields.
 type Claims struct {
-	Subject   string         `json:"sub,omitempty"`
-	Email     string         `json:"email,omitempty"`
-	IssuedAt  int64          `json:"iat,omitempty"`
-	ExpiresAt int64          `json:"exp,omitempty"`
-	Extra     map[string]any `json:"-"`
+	Subject   string `json:"sub,omitempty"`
+	Email     string `json:"email,omitempty"`
+	JWTID     string `json:"jti,omitempty"` // unique token ID used for revocation
+	IssuedAt  int64  `json:"iat,omitempty"`
+	ExpiresAt int64  `json:"exp,omitempty"`
 }
 
-func b64encode(b []byte) string {
-	return base64.RawURLEncoding.EncodeToString(b)
-}
+func b64encode(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
 
-func b64decode(s string) ([]byte, error) {
-	return base64.RawURLEncoding.DecodeString(s)
-}
+func b64decode(s string) ([]byte, error) { return base64.RawURLEncoding.DecodeString(s) }
 
-func sign(signingInput string, secret []byte) string {
+func sign(input string, secret []byte) string {
 	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(signingInput))
+	mac.Write([]byte(input))
 	return b64encode(mac.Sum(nil))
 }
 
@@ -51,18 +47,17 @@ func Sign(claims Claims, secret []byte, ttl time.Duration) (string, error) {
 	claims.IssuedAt = now.Unix()
 	claims.ExpiresAt = now.Add(ttl).Unix()
 
-	headerJSON, err := json.Marshal(header{Alg: "HS256", Typ: "JWT"})
+	hJSON, err := json.Marshal(header{Alg: "HS256", Typ: "JWT"})
 	if err != nil {
 		return "", err
 	}
-	claimsJSON, err := json.Marshal(claims)
+	cJSON, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
 	}
 
-	signingInput := b64encode(headerJSON) + "." + b64encode(claimsJSON)
-	signature := sign(signingInput, secret)
-	return signingInput + "." + signature, nil
+	si := b64encode(hJSON) + "." + b64encode(cJSON)
+	return si + "." + sign(si, secret), nil
 }
 
 // Parse verifies a token's signature and expiry, returning its claims.
@@ -72,23 +67,27 @@ func Parse(token string, secret []byte) (*Claims, error) {
 		return nil, ErrInvalidToken
 	}
 
-	signingInput := parts[0] + "." + parts[1]
-	expected := sign(signingInput, secret)
+	si := parts[0] + "." + parts[1]
+	expected := sign(si, secret)
+	// constant-time comparison prevents timing oracle on the signature
 	if !hmac.Equal([]byte(expected), []byte(parts[2])) {
 		return nil, ErrInvalidToken
 	}
 
-	claimsJSON, err := b64decode(parts[1])
+	cJSON, err := b64decode(parts[1])
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	var claims Claims
-	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
+	var c Claims
+	if err := json.Unmarshal(cJSON, &c); err != nil {
 		return nil, ErrInvalidToken
 	}
-
-	if claims.ExpiresAt != 0 && time.Now().Unix() > claims.ExpiresAt {
+	now := time.Now().Unix()
+	if c.IssuedAt > now+30 { // allow 30 s clock skew, reject future-issued tokens
 		return nil, ErrInvalidToken
 	}
-	return &claims, nil
+	if c.ExpiresAt != 0 && now > c.ExpiresAt {
+		return nil, ErrInvalidToken
+	}
+	return &c, nil
 }

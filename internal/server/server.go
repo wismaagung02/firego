@@ -10,14 +10,28 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"firego/internal/auth"
 	"firego/internal/database"
+	"firego/internal/ratelimit"
 	"firego/internal/realtime"
 	"firego/internal/storage"
 )
+
+const (
+	// maxUploadBytes caps storage object uploads to prevent DoS.
+	maxUploadBytes = 100 << 20 // 100 MiB
+	// maxJSONBytes caps JSON request bodies.
+	maxJSONBytes = 8 << 20 // 8 MiB
+)
+
+// validDBSegment rejects path segments that could cause confusion or inject
+// control characters into the JSON tree. Dots and hyphens are allowed to
+// mirror Firebase's supported key characters.
+var validDBSegment = regexp.MustCompile(`^[a-zA-Z0-9_\-\.]+$`)
 
 // Server holds the application services and HTTP routing.
 type Server struct {
@@ -27,24 +41,35 @@ type Server struct {
 	hub     *realtime.Hub
 	mux     *http.ServeMux
 	webRoot string
+	authRL  *ratelimit.Limiter // rate limiter for auth endpoints
 }
 
 // New constructs a Server and registers all routes.
 func New(a *auth.Service, db *database.DB, store *storage.Store, hub *realtime.Hub, webRoot string) *Server {
-	s := &Server{auth: a, db: db, store: store, hub: hub, mux: http.NewServeMux(), webRoot: webRoot}
+	s := &Server{
+		auth:    a,
+		db:      db,
+		store:   store,
+		hub:     hub,
+		mux:     http.NewServeMux(),
+		webRoot: webRoot,
+		authRL:  ratelimit.New(10, time.Minute), // 10 auth requests / min / IP
+	}
 	s.routes()
 	return s
 }
 
-// Handler returns the root HTTP handler with logging and CORS applied.
+// Handler returns the root HTTP handler with logging, security headers, and
+// CORS applied.
 func (s *Server) Handler() http.Handler {
-	return logging(cors(s.mux))
+	return logging(securityHeaders(cors(s.mux)))
 }
 
 func (s *Server) routes() {
 	// Auth
-	s.mux.HandleFunc("POST /v1/auth/register", s.handleRegister)
-	s.mux.HandleFunc("POST /v1/auth/login", s.handleLogin)
+	s.mux.HandleFunc("POST /v1/auth/register", s.rateLimit(s.handleRegister))
+	s.mux.HandleFunc("POST /v1/auth/login", s.rateLimit(s.handleLogin))
+	s.mux.HandleFunc("POST /v1/auth/logout", s.requireAuth(s.handleLogout))
 	s.mux.HandleFunc("GET /v1/auth/me", s.requireAuth(s.handleMe))
 
 	// Realtime database (REST). Trailing path is the data location.
@@ -109,6 +134,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": user, "token": token})
 }
 
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request, _ *auth.User) {
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if err := s.auth.Logout(token); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"logged_out": true})
+}
+
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request, user *auth.User) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
@@ -117,6 +151,10 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request, user *auth.Use
 
 func (s *Server) handleDBGet(w http.ResponseWriter, r *http.Request) {
 	path := r.PathValue("path")
+	if err := validateDBPath(path); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	val, err := s.db.Get(path)
 	if errors.Is(err, database.ErrNotFound) {
 		writeJSON(w, http.StatusOK, nil)
@@ -130,11 +168,16 @@ func (s *Server) handleDBGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDBPut(w http.ResponseWriter, r *http.Request, _ *auth.User) {
+	path := r.PathValue("path")
+	if err := validateDBPath(path); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	var val any
 	if !decodeJSON(w, r, &val) {
 		return
 	}
-	if err := s.db.Set(r.PathValue("path"), val); err != nil {
+	if err := s.db.Set(path, val); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -142,11 +185,16 @@ func (s *Server) handleDBPut(w http.ResponseWriter, r *http.Request, _ *auth.Use
 }
 
 func (s *Server) handleDBPatch(w http.ResponseWriter, r *http.Request, _ *auth.User) {
+	path := r.PathValue("path")
+	if err := validateDBPath(path); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	var val map[string]any
 	if !decodeJSON(w, r, &val) {
 		return
 	}
-	if err := s.db.Update(r.PathValue("path"), val); err != nil {
+	if err := s.db.Update(path, val); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -154,11 +202,16 @@ func (s *Server) handleDBPatch(w http.ResponseWriter, r *http.Request, _ *auth.U
 }
 
 func (s *Server) handleDBPush(w http.ResponseWriter, r *http.Request, _ *auth.User) {
+	path := r.PathValue("path")
+	if err := validateDBPath(path); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	var val any
 	if !decodeJSON(w, r, &val) {
 		return
 	}
-	key, err := s.db.Push(r.PathValue("path"), val)
+	key, err := s.db.Push(path, val)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -167,7 +220,12 @@ func (s *Server) handleDBPush(w http.ResponseWriter, r *http.Request, _ *auth.Us
 }
 
 func (s *Server) handleDBDelete(w http.ResponseWriter, r *http.Request, _ *auth.User) {
-	if err := s.db.Delete(r.PathValue("path")); err != nil {
+	path := r.PathValue("path")
+	if err := validateDBPath(path); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.db.Delete(path); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -187,6 +245,8 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	// Override the frame-options for SSE endpoints so browser EventSource works.
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	events, unsubscribe := s.hub.Subscribe(prefix)
 	defer unsubscribe()
@@ -227,9 +287,18 @@ func writeSSE(w io.Writer, flusher http.Flusher, ev realtime.Event) {
 // ---------- Storage handlers ----------
 
 func (s *Server) handleStoragePut(w http.ResponseWriter, r *http.Request, _ *auth.User) {
+	// Limit upload size before streaming to disk.
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
 	defer r.Body.Close()
+
 	obj, err := s.store.Put(r.PathValue("name"), r.Header.Get("Content-Type"), r.Body)
 	if err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			writeError(w, http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("file too large (max %d MiB)", maxUploadBytes>>20))
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -292,6 +361,32 @@ func (s *Server) requireAuth(next authedHandler) http.HandlerFunc {
 	}
 }
 
+// rateLimit enforces the per-IP auth rate limit.
+func (s *Server) rateLimit(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.authRL.Allow(ratelimit.ClientIP(r)) {
+			writeError(w, http.StatusTooManyRequests, "too many requests — try again later")
+			return
+		}
+		next(w, r)
+	}
+}
+
+// securityHeaders adds defensive HTTP response headers.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("X-XSS-Protection", "1; mode=block")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		// 'unsafe-inline' required for the inline scripts/styles in the dashboard.
+		h.Set("Content-Security-Policy",
+			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -315,7 +410,7 @@ func logging(next http.Handler) http.Handler {
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	defer r.Body.Close()
-	dec := json.NewDecoder(io.LimitReader(r.Body, 8<<20)) // 8 MiB cap
+	dec := json.NewDecoder(io.LimitReader(r.Body, maxJSONBytes))
 	if err := dec.Decode(dst); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
 		return false
@@ -331,4 +426,22 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// validateDBPath rejects path segments that are empty, dot-only, or contain
+// characters outside the safe Firebase key alphabet.
+func validateDBPath(p string) error {
+	p = strings.Trim(p, "/")
+	if p == "" {
+		return nil // root path is allowed
+	}
+	for _, seg := range strings.Split(p, "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return fmt.Errorf("invalid path segment %q", seg)
+		}
+		if !validDBSegment.MatchString(seg) {
+			return fmt.Errorf("path segment %q contains invalid characters", seg)
+		}
+	}
+	return nil
 }
