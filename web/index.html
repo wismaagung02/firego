@@ -995,6 +995,13 @@ FIREGO_WEB        → direktori dashboard (default: /app/web)</div>
         <div class="dc">docker build -t firego .
 docker run -p 8080:8080 firego
 # Buka http://localhost:8080</div>
+
+        <h3>Opsi 4 — Deploy ke server sendiri via SSH</h3>
+        <p>Punya VPS atau shared hosting cPanel ber-SSH? GitHub Actions bisa build binary lalu kirim & restart otomatis. Kredensial SSH disimpan di GitHub Secrets, bukan di kode.</p>
+        <div class="dc">Secrets: SSH_HOST, SSH_USER, SSH_KEY, SSH_PORT
+Workflow: .github/workflows/deploy.yml
+Panduan: deploy/README.md</div>
+        <div class="note">Di shared hosting tanpa root, Firego dijalankan via <code>systemctl --user</code> atau keepalive cron (otomatis dipilih). Port custom perlu di-proxy ke domain — cek dukungan hosting Anda.</div>
       </div>
 
     </div><!-- /.modal-body -->

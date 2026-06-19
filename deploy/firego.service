@@ -1,0 +1,26 @@
+# systemd USER service untuk Firego (TANPA root).
+# Pasang hanya jika `systemctl --user` tersedia di host Anda:
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp firego.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now firego.service
+#   loginctl enable-linger "$USER"   # agar tetap jalan walau logout
+#
+[Unit]
+Description=Firego — Firebase-like backend
+After=network.target
+
+[Service]
+Type=simple
+# %h = home directory user
+WorkingDirectory=%h/firego
+EnvironmentFile=-%h/firego/.firego.env
+Environment=FIREGO_DATA=%h/firego/data
+Environment=FIREGO_WEB=%h/firego/web
+ExecStart=%h/firego/firego
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
