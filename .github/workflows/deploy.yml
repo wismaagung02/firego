@@ -1,0 +1,76 @@
+name: Deploy ke server via SSH
+
+# Build binary Firego di GitHub lalu kirim & restart di server Anda lewat SSH.
+# Kredensial diambil dari GitHub Secrets — tidak pernah ada di kode.
+#
+# Secrets yang WAJIB diisi (Settings → Secrets and variables → Actions):
+#   SSH_HOST   : alamat server (mis. server.hostingku.com)
+#   SSH_USER   : username SSH cPanel Anda
+#   SSH_KEY    : isi private key SSH (PEM/OpenSSH)
+#   SSH_PORT   : (opsional) port SSH, default 22
+#
+# Variables opsional (Settings → Variables):
+#   DEPLOY_DIR : direktori tujuan di server, default ~/firego
+#   GOARCH     : arsitektur target, default amd64 (pakai arm64 bila perlu)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build binary (Linux ${{ vars.GOARCH || 'amd64' }})
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=${{ vars.GOARCH || 'amd64' }} \
+            go build -ldflags="-s -w" -o firego-bin ./cmd/firego
+
+      - name: Upload bundle ke server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key:      ${{ secrets.SSH_KEY }}
+          port:     ${{ secrets.SSH_PORT || 22 }}
+          # Kirim ke folder staging dulu, lalu dipindah atomik oleh restart
+          source:   "firego-bin,web/**,deploy/restart.sh,deploy/keepalive.sh,deploy/firego.service"
+          target:   "${{ vars.DEPLOY_DIR || '~/firego' }}/.staging"
+          overwrite: true
+
+      - name: Pasang & restart
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host:     ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key:      ${{ secrets.SSH_KEY }}
+          port:     ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            DIR="${{ vars.DEPLOY_DIR || '$HOME/firego' }}"
+            DIR="${DIR/#\~/$HOME}"
+            S="$DIR/.staging"
+            mkdir -p "$DIR/data"
+            # Pindahkan artefak dari staging
+            mv -f "$S/firego-bin" "$DIR/firego"
+            rm -rf "$DIR/web" && mv -f "$S/web" "$DIR/web"
+            mv -f "$S/deploy/restart.sh"   "$DIR/restart.sh"
+            mv -f "$S/deploy/keepalive.sh" "$DIR/keepalive.sh"
+            mv -f "$S/deploy/firego.service" "$DIR/firego.service" || true
+            chmod +x "$DIR/firego" "$DIR/restart.sh" "$DIR/keepalive.sh"
+            rm -rf "$S"
+            # Jalankan ulang
+            FIREGO_DIR="$DIR" "$DIR/restart.sh"
