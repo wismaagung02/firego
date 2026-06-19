@@ -22,7 +22,7 @@ import (
 )
 
 func main() {
-	addr    := flag.String("addr", envOr("FIREGO_ADDR", ":8080"), "HTTP listen address")
+	addr    := flag.String("addr", defaultAddr(),                "HTTP listen address")
 	dataDir := flag.String("data", envOr("FIREGO_DATA", "data"),  "directory for persisted data")
 	webDir  := flag.String("web",  envOr("FIREGO_WEB",  "web"),   "directory served as the dashboard")
 	flag.Parse()
@@ -31,8 +31,11 @@ func main() {
 		log.Fatalf("create data dir: %v", err)
 	}
 
-	masterSecret := loadOrGenKey(filepath.Join(*dataDir, "secret.key"))
-	adminKey     := loadOrGenKey(filepath.Join(*dataDir, "admin.key"))
+	// Keys may be supplied via env (recommended for cloud deploys with
+	// ephemeral storage) so they stay stable across restarts; otherwise
+	// they are loaded from disk or generated.
+	masterSecret := keyFromEnvOrFile("FIREGO_SECRET", filepath.Join(*dataDir, "secret.key"))
+	adminKey     := keyFromEnvOrFile("FIREGO_ADMIN_KEY", filepath.Join(*dataDir, "admin.key"))
 
 	mgr, err := apps.New(*dataDir, masterSecret)
 	if err != nil {
@@ -66,6 +69,15 @@ func main() {
 	}
 }
 
+// keyFromEnvOrFile returns the value of env var key if set, otherwise it
+// falls back to loadOrGenKey on path.
+func keyFromEnvOrFile(env, path string) []byte {
+	if v := os.Getenv(env); v != "" {
+		return []byte(v)
+	}
+	return loadOrGenKey(path)
+}
+
 // loadOrGenKey reads an existing key from path or creates and persists a fresh one.
 func loadOrGenKey(path string) []byte {
 	if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
@@ -87,4 +99,14 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// defaultAddr resolves the listen address. Cloud platforms such as Render,
+// Railway and Cloud Run inject a PORT env var; honour it, then FIREGO_ADDR,
+// then fall back to :8080.
+func defaultAddr() string {
+	if p := os.Getenv("PORT"); p != "" {
+		return ":" + p
+	}
+	return envOr("FIREGO_ADDR", ":8080")
 }
