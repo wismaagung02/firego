@@ -1,0 +1,25 @@
+# Render Blueprint — deploy Firego langsung dari repo GitHub.
+# Cara pakai:
+#   1. Buka https://dashboard.render.com → New → Blueprint
+#   2. Connect repo GitHub ini, Render otomatis membaca file ini
+#   3. Klik Apply — Render build Dockerfile dan beri URL publik
+services:
+  - type: web
+    name: firego
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # Master secret & admin key: set sekali, jangan diubah agar token tetap valid.
+      # Hapus dua baris di bawah jika ingin Render generate otomatis.
+      - key: FIREGO_DATA
+        value: /app/data
+    # ── Persisten (opsional) ──────────────────────────────────────────────
+    # Free plan TIDAK mendukung disk. Untuk data persisten, naikkan plan lalu
+    # uncomment blok berikut:
+    # disk:
+    #   name: firego-data
+    #   mountPath: /app/data
+    #   sizeGB: 1

@@ -1,0 +1,6 @@
+.git
+.github
+data
+*.tmp
+firego
+README.md

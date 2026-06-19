@@ -533,6 +533,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDocs() 
       <button data-tab="remoteconfig" onclick="switchTab('remoteconfig')">Remote Config</button>
       <button data-tab="rules"        onclick="switchTab('rules')"       >Security Rules</button>
       <button data-tab="appmgmt"      onclick="switchTab('appmgmt')"     >App Management</button>
+      <button data-tab="deploy"       onclick="switchTab('deploy')"      >Deploy</button>
     </div>
     <div class="modal-body">
 
@@ -955,6 +956,45 @@ $variable                  → segment path wildcard
   ├── rules.json          ← security rules
   └── remote_config.json  ← remote config params</div>
         <p>JWT secret per app diturunkan dari master secret via <code>HMAC-SHA256(masterSecret, "firego-app:" + appID)</code> — token antar app tidak saling berlaku.</p>
+      </div>
+
+      <!-- ── Deploy ── -->
+      <div class="doc-sec" id="doc-deploy">
+        <h3>Akses Firego Lewat URL Publik</h3>
+        <p>GitHub Pages hanya melayani file statis, sedangkan Firego butuh server Go yang berjalan. Gunakan platform container berikut yang build langsung dari repo GitHub.</p>
+
+        <h3>Opsi 1 — Render (paling mudah)</h3>
+        <div class="dc">1. Buka https://dashboard.render.com → New → Blueprint
+2. Connect repo GitHub Anda (render.yaml sudah tersedia)
+3. Klik Apply → Render build Dockerfile & beri URL:
+   https://firego-xxxx.onrender.com</div>
+        <div class="note">Set Environment Variable <code>FIREGO_ADMIN_KEY</code> dan <code>FIREGO_SECRET</code> di dashboard Render agar admin key stabil (tidak berubah tiap restart).</div>
+
+        <h3>Opsi 2 — Railway / Fly.io / Cloud Run</h3>
+        <p>Semua platform container bisa memakai Dockerfile yang sama. Server otomatis mengikuti env <code>PORT</code> yang disuntikkan platform.</p>
+
+        <h3>Opsi 3 — Image dari GitHub Container Registry</h3>
+        <p>Setiap push ke <code>main</code>, GitHub Actions build & publish image ke GHCR:</p>
+        <div class="dc">docker run -p 8080:8080 \
+  -e FIREGO_ADMIN_KEY=rahasia-admin \
+  -e FIREGO_SECRET=rahasia-secret \
+  ghcr.io/wismaagung02/firego:latest</div>
+
+        <h3>Environment Variables</h3>
+        <div class="dc">PORT              → port listen (di-set platform otomatis)
+FIREGO_ADMIN_KEY  → admin key tetap (disarankan di cloud)
+FIREGO_SECRET     → master secret JWT (disarankan di cloud)
+FIREGO_DATA       → direktori data (default: /app/data)
+FIREGO_WEB        → direktori dashboard (default: /app/web)</div>
+
+        <h3>Persistensi Data</h3>
+        <p>Free tier umumnya memakai storage ephemeral — data hilang saat redeploy. Untuk data permanen, pasang persistent disk/volume dengan mount path <code>/app/data</code> (lihat komentar di <code>render.yaml</code>).</p>
+        <div class="note">Tanpa <code>FIREGO_ADMIN_KEY</code>, admin key di-generate acak dan tampil di log startup platform.</div>
+
+        <h3>Jalankan Lokal dengan Docker</h3>
+        <div class="dc">docker build -t firego .
+docker run -p 8080:8080 firego
+# Buka http://localhost:8080</div>
       </div>
 
     </div><!-- /.modal-body -->
